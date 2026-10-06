@@ -1,7 +1,8 @@
 \documentclass[10pt]{article}
 \usepackage[margin=2.1cm]{geometry}
 \usepackage{graphicx,booktabs,xcolor,enumitem,amsmath,caption,float,tabularx,microtype,array}
-\usepackage[hidelinks]{hyperref}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, urlcolor={blue!70!black}, linkcolor=black, citecolor=black, filecolor=black}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,backgrounds,calc}
 \usepackage{listings}
@@ -28,7 +29,7 @@
 \title{\textbf{The DUNE FD-VD light simulation for low-energy physics:\\
 workflow, five simulation bugs, and proposed fixes}}
 \author{Haiwang Yu\\[2pt]
-\small Bugs B, C, D, E and N1 were found by Xin Qian (fdvd\_sim studies, \code{WireCell/wcp-porting-validation});\\
+\small Bugs B, C, D, E and N1 were found by Xin Qian (fdvd\_sim studies, \href{https://github.com/WireCell/wcp-porting-validation/tree/main/fdvd_sim/docs}{\code{WireCell/wcp-porting-validation}});\\
 \small this note reproduces them, fixes them in \code{duneopdet}, and measures the effect of each fix.}
 \date{Draft, \today}
 
@@ -242,7 +243,7 @@ bugs of this note live in step 4.}
 
 \subsection{Running it: the minimum workflow}
 \label{sec:run}
-All code is in \code{FD-LE/00-op-sim-debug/work} (\code{github.com/HaiwangYu/FD-LE}). dunesw \code{v10} is built for
+All code is in \code{FD-LE/00-op-sim-debug/work} (\href{https://github.com/HaiwangYu/FD-LE}{\code{github.com/HaiwangYu/FD-LE}}). dunesw \code{v10} is built for
 Scientific Linux 7; on the AlmaLinux 9 \code{dunegpvm}/\code{dunebuild} machines every LArSoft command runs inside
 the Fermilab SL7 container, which \code{env/in-sl7.sh} starts and sets up. One event through the whole chain:
 \begin{lstlisting}

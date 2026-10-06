@@ -41,5 +41,5 @@ python3 analysis/make_plots.py data ../tech-note/figs && ../tech-note/build.sh
 | `work/scripts/run_rerun.sh` | rerun the light simulation of an event in one of 8 configurations |
 | `work/analysis/dump_light.py` | per-event numbers (snippets, OpHits, PE by source, dark counts, ...) -> `light.npz` |
 | `work/analysis/make_plots.py` | every figure and number of the tech-note |
-| `work/patches/` | the proposed duneopdet change |
+| `work/patches/` | the proposed duneopdet change; the same change as a commit: branch [`fix-light-sim-pileup`](https://github.com/HaiwangYu/duneopdet/tree/fix-light-sim-pileup) of the duneopdet fork |
 | `tech-note/` | LaTeX source, figures, PDF; `tech-note/build.sh` builds it |

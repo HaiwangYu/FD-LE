@@ -92,7 +92,9 @@ N1 & \code{SIPMOpSensorSim} & photon detection is a second Poisson draw instead 
 \item \textbf{D, E and N1 act in every event.} D moves the dark counts onto the neutrino flash. E creates a handful of
   waveform snippets with a nonsense time stamp (and reads memory outside the waveform buffer). N1 makes the photon
   counting statistics too wide.
-\item \textbf{Proposal.} One patch (appendix~\ref{app:patch}). B, D and N1 are fixed by default with a switch back to
+\item \textbf{Proposal.} One commit on branch \code{fix-light-sim-pileup} of
+  \href{https://github.com/HaiwangYu/duneopdet/tree/fix-light-sim-pileup}{\code{github.com/HaiwangYu/duneopdet}},
+  on top of \code{DUNE/duneopdet} \code{develop} (appendix~\ref{app:patch}). B, D and N1 are fixed by default with a switch back to
   the legacy behaviour; E has no switch (the legacy output is undefined behaviour); C changes the light model and is
   opt-in (\code{LateLightReference: "Track"}), to be decided by the photon-detector simulation experts.
 \item \textbf{Other known issues} of the same chain, not fixed here, are listed in section~\ref{sec:other}. The
@@ -521,8 +523,11 @@ From Xin Qian's fdvd\_sim docs 03, 08 and 30; letters and numbers as there.
 \section{The patch}
 \label{app:patch}
 %=====================================================================================================================
-The patch is \code{work/patches/duneopdet-light-sim-fixes.patch}.
-It is made against \code{DUNE/duneopdet} \code{develop} and also applies to \code{v10\_26\_00d00}:
+The fixes are commit \code{6c73f2f} on branch \code{fix-light-sim-pileup} of the fork
+\href{https://github.com/HaiwangYu/duneopdet/tree/fix-light-sim-pileup}{\code{github.com/HaiwangYu/duneopdet}},
+on top of \code{DUNE/duneopdet} \code{develop} (\code{497d0a1}, 2026-10-06), ready for a pull request.
+The same change is the patch \fn{work/patches/duneopdet-light-sim-fixes.patch}, which also applies to
+\code{v10\_26\_00d00} and is what \fn{scripts/build_duneopdet.sh} builds:
 \begin{itemize}
 \item \code{OpticalDetector/FocusList.h} (new): \code{FocusList} moved out of \code{WaveformDigitizerSim\_module.cc},
   with the merging \code{AddRange} (B).

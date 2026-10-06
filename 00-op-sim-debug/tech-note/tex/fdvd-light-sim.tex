@@ -122,6 +122,26 @@ emit $\gamma$s and neutrons: the DUNE radiological model puts about 130\,000 dec
 FD-VD workspace. Figure~\ref{fig:overview} shows the light of one simulated readout: the MARLEY flash
 (\numAexmarleype\ PE) is one of many flashes in a sea of \numAexbkgpe\ background PE.
 
+\paragraph{Solar and supernova: one generator.} MARLEY is not specific to solar neutrinos. It simulates
+neutrino--argon interactions at tens of MeV: $\nu_e$ charged current on ${}^{40}$Ar, elastic scattering on electrons
+(the directional channel used for supernova pointing) and coherent scattering on ${}^{40}$Ar. It was in fact
+developed with supernova neutrinos in mind. A ``solar'' or ``supernova'' sample differs only in the neutrino spectrum
+given to MARLEY and the reactions switched on (dunesim \fn{marley_dune.fcl}):
+\begin{itemize}
+\item solar: \code{dune\_marley\_solar\_nue\_cc\_flat}, $\nu_e$ CC on a flat spectrum from 2\,MeV, reweighted to the
+  ${}^{8}$B spectrum afterwards (used in this note);
+\item supernova: \code{dune\_marley\_garching}, \code{\_livermore} and \code{\_gkvm} (supernova-model spectra), a
+  Fermi--Dirac spectrum, or flat and mono-energetic spectra, with CC, elastic scattering or both.
+\end{itemize}
+The FD-VD 1x8x14 workspace has job files for both, with and without radiological background
+(\fn{prodmarley_solar_cc_flat_*} and \fn{prodmarley_nue_{cc,es}_flat_*}, \fn{prodmarley_nue_spectrum_*},
+\fn{prodmarley_nue_mono10_*}); the Geant4 job used here is even called \fn{supernova_g4stage1_*}. Supernova
+neutrinos are more energetic (a peak at 10--20\,MeV and a tail to $\sim$50\,MeV, against at most $\sim$15\,MeV for
+${}^{8}$B solar neutrinos), and a real burst brings thousands of interactions within $\sim$10\,s. The DUNE job files
+simulate one interaction per readout at $t=0$, solar and supernova alike, so \textbf{the bugs of this note affect
+supernova samples in the same way}: B and C wherever the radiological background is simulated with the neutrino,
+D, E and N1 in every event.
+
 \begin{figure}[H]\centering
 \includegraphics[width=\linewidth]{fig_overview_light.pdf}
 \caption{Photoelectrons (PE) detected in one mixed event (stock simulation), per \textmu s. Grey: all light; red:

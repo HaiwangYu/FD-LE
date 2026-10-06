@@ -1,0 +1,10 @@
+# Light-only detector simulation for the FD-VD 1x8x14 workspace.
+#
+# The official detsim job with only the photon-detector (PDS) part scheduled:
+#   sipmAr10ppm, sipmXe10ppm, sipmAr10ppmExt, sipmXe10ppmExt  (SIPMOpSensorSim: photons -> photoelectrons, OpDetDivRec)
+#   opdigi10ppm                                               (WaveformDigitizerSim: PEs -> raw::OpDetWaveform snippets)
+# The TPC part (wire-cell drift + signal processing) is skipped: it is slow and plays no role in the light bugs.
+# Adapted from Xin Qian's wcp-porting-validation fdvd_sim/stageA/detsim_light_only.fcl.
+#include "standard_detsim_dunevd10kt_1x8x14_3view_30deg.fcl"
+
+physics.simulate: [ @sequence::dunefd_vertdrift_detsim_pds_only ]

@@ -1,0 +1,598 @@
+diff --git a/duneopdet/OpticalDetector/CMakeLists.txt b/duneopdet/OpticalDetector/CMakeLists.txt
+index d4e4a31..82414a0 100644
+--- a/duneopdet/OpticalDetector/CMakeLists.txt
++++ b/duneopdet/OpticalDetector/CMakeLists.txt
+@@ -99,3 +99,4 @@ install_source()
+ add_subdirectory(Deconvolution)
+ add_subdirectory(OpHitFinder)
+ add_subdirectory(Ana)
++add_subdirectory(test)
+diff --git a/duneopdet/OpticalDetector/SIPMOpSensorSim.fcl b/duneopdet/OpticalDetector/SIPMOpSensorSim.fcl
+index 08aa820..b850c59 100644
+--- a/duneopdet/OpticalDetector/SIPMOpSensorSim.fcl
++++ b/duneopdet/OpticalDetector/SIPMOpSensorSim.fcl
+@@ -7,6 +7,8 @@ xarapuca_ar:
+   QuantumEfficiency: 0.030 # 3% X-ARAPUCA efficiency
+   DarkNoiseRate:     10.0 # Hz
+   CrossTalk:         0.20
++  DarkNoiseTimeInNs: true  # false = legacy: dark-count times in us stored as ns (all within a few us of t = 0)
++  BinomialQE:        true  # false = legacy: Poisson(QE*n) on top of PDFastSim's Poisson (PE variance too large)
+ }
+ 
+ xarapuca_ar_refl:                             @local::xarapuca_ar
+@@ -24,6 +26,10 @@ xarapuca_ar_xe10ppm.InputTag:                "PDFastSimAr"
+ xarapuca_ar_xe10ppm.Correction:              0.65
+ xarapuca_ar_xe10ppm.LateLightCorrection:     0.31
+ xarapuca_ar_xe10ppm.LateLightBoundary:       10   # ns
++# Late light is counted from the first photon on the OpDet of the whole event ("Event", legacy)
++# or of the same track ("Track"). With pile-up, "Event" treats all light of every interaction
++# after the first one on an OpDet, prompt included, as late.
++xarapuca_ar_xe10ppm.LateLightReference:      "Event"
+ 
+ # Early light already disabled at PDFastSim stage
+ # Correct down by 0.7 to account for remaining Ar late light
+diff --git a/duneopdet/OpticalDetector/SIPMOpSensorSim_module.cc b/duneopdet/OpticalDetector/SIPMOpSensorSim_module.cc
+index 1f3d0ba..94e7b10 100644
+--- a/duneopdet/OpticalDetector/SIPMOpSensorSim_module.cc
++++ b/duneopdet/OpticalDetector/SIPMOpSensorSim_module.cc
+@@ -54,11 +54,15 @@
+ #include "CLHEP/Random/RandExponential.h"
+ #include "CLHEP/Random/RandFlat.h"
+ #include "CLHEP/Random/RandPoissonQ.h"
++#include "CLHEP/Random/RandBinomial.h"
+ 
+ // C++ includes
+ 
+ #include <vector>
+ #include <map>
++#include <string>
++#include <unordered_map>
++#include <algorithm>
+ #include <cmath>
+ #include <memory>
+ 
+@@ -82,6 +86,21 @@ namespace opdet {
+       fhicl::Atom<double>         Correction          { Name("Correction"),          Comment("Adjust the amount of total light. Kept seprate from QE for clarity."), 1};
+       fhicl::OptionalAtom<double> LateLightCorrection { Name("LateLightCorrection"), Comment("Adjust the amount of late light")};
+       fhicl::OptionalAtom<double> LateLightBoundary   { Name("LateLightBoundary"),   Comment("Boundary that defines late light (ns)") };
++      fhicl::Atom<std::string>    LateLightReference  { Name("LateLightReference"),
++                                                        Comment("Time that late light is counted from, on each OpDet: \"Event\" = first photon of the "
++                                                                "whole event (legacy; with pile-up every later interaction's light is late), "
++                                                                "\"Track\" = first photon of the same track"),
++                                                        "Event" };
++      fhicl::Atom<bool>           DarkNoiseTimeInNs   { Name("DarkNoiseTimeInNs"),
++                                                        Comment("Store dark-count times in ns, like the photon times. false reproduces the legacy "
++                                                                "behaviour, which stores the us value as ns and puts every dark count within "
++                                                                "a few us of t = 0. Default true."),
++                                                        true };
++      fhicl::Atom<bool>           BinomialQE          { Name("BinomialQE"),
++                                                        Comment("Detect each photon of an SDP with probability QE (binomial). false reproduces the "
++                                                                "legacy Poisson(QE*n), which on top of PDFastSim's own Poisson draw inflates the PE "
++                                                                "variance and allows more PE than photons. Default true."),
++                                                        true };
+ 
+     };
+     using Parameters = art::EDProducer::Table<Config>;
+@@ -105,12 +124,16 @@ namespace opdet {
+     bool          fCorrectLateLight;    // Do we apply a late light correction?
+     double        fLateLightCorrection; // How much to correct the late light
+     double        fLateLightBoundary;   // What is the boundary which defines late light?
++    bool          fLateLightPerTrack;   // Is late light counted from each track's first photon (else the event's)?
++    bool          fDarkNoiseTimeInNs;   // Are dark-count times converted to ns (else legacy: us stored as ns)?
++    bool          fBinomialQE;          // Is detection binomial per photon (else legacy: Poisson on the mean)?
+ 
+     // Random number engines
+     CLHEP::HepRandomEngine& fSIPMEngine;
+     CLHEP::RandExponential  fRandExponential;
+     CLHEP::RandFlat         fRandFlat;
+     CLHEP::RandPoissonQ     fRandPoissPhot;
++    CLHEP::RandBinomial     fRandBinomPhot;
+   
+     // Produce waveform on one of the optical detectors
+     // These cannot be const due to the random number generators
+@@ -151,6 +174,7 @@ namespace opdet {
+     , fRandExponential(fSIPMEngine)
+     , fRandFlat(fSIPMEngine)
+     , fRandPoissPhot(fSIPMEngine)
++    , fRandBinomPhot(fSIPMEngine)
+   {
+ 
+     // This module produces (infrastructure piece)
+@@ -215,6 +239,16 @@ namespace opdet {
+         << "Leave both out to not adjust late light.\n";
+     }
+ 
++    std::string const lateLightReference = config().LateLightReference();
++    if (lateLightReference != "Event" && lateLightReference != "Track") {
++      throw art::Exception(art::errors::Configuration)
++        << "LateLightReference: \"" << lateLightReference << "\"\n"
++        << "Must be \"Event\" or \"Track\".\n";
++    }
++    fLateLightPerTrack = (lateLightReference == "Track");
++    fDarkNoiseTimeInNs = config().DarkNoiseTimeInNs();
++    fBinomialQE        = config().BinomialQE();
++
+     if (fCorrectLateLight && fLateLightCorrection*tempQE > LarProp->ScintPreScale())
+     {
+       throw art::Exception(art::errors::Configuration)
+@@ -265,12 +299,24 @@ namespace opdet {
+     if (btr.timePDclockSDPsMap().size() == 0)
+       return;
+ 
+-    // Get the earliest time in the BTR
+-    double firstTime = btr.timePDclockSDPsMap()[0].first;
++    // Late light is light arriving more than fLateLightBoundary after a
++    // reference time on this OpDet. The BTR covers the whole event, so with
++    // pile-up the first photon of the event usually comes from an earlier
++    // interaction, and all light of the later ones, prompt included, counts
++    // as late. Per track, each track's light is counted from that track's
++    // first photon: tracks of one interaction start within ns of each other,
++    // and delayed processes (captures, decays) get their own reference.
++    double firstTime = 0.;
++    std::unordered_map<int, double> firstTimeOfTrack;
+     if (fCorrectLateLight) {
+-      for (auto time_sdps : btr.timePDclockSDPsMap()) {
+-        double time = btr.timePDclockSDPsMap()[0].first;
++      firstTime = btr.timePDclockSDPsMap()[0].first;
++      for (auto const& [time, sdps]: btr.timePDclockSDPsMap()) {
+         if (time < firstTime) firstTime = time;
++        if (!fLateLightPerTrack) continue;
++        for (auto const& sdp : sdps) {
++          auto const [it, inserted] = firstTimeOfTrack.try_emplace(sdp.trackID, time);
++          if (!inserted && time < it->second) it->second = time;
++        }
+       }
+     }
+ 
+@@ -278,7 +324,7 @@ namespace opdet {
+     for (auto const& [time, sdps]: btr.timePDclockSDPsMap()) {
+ 
+       double lateScale = 1.;
+-      if (fCorrectLateLight) {
++      if (fCorrectLateLight && !fLateLightPerTrack) {
+         if (time > firstTime + fLateLightBoundary)
+           lateScale = fLateLightCorrection;
+       }
+@@ -286,8 +332,20 @@ namespace opdet {
+       // Loop through SDPs
+       for(auto const& sdp : sdps) {
+ 
+-        // Reduce true photons by QE, poisson-fluctuate
+-        int nphot = fRandPoissPhot.fire(fQE * (double)sdp.numPhotons * lateScale);
++        if (fCorrectLateLight && fLateLightPerTrack)
++          lateScale = (time > firstTimeOfTrack.at(sdp.trackID) + fLateLightBoundary) ? fLateLightCorrection : 1.;
++
++        // Reduce true photons by QE. sdp.numPhotons is already a Poisson draw
++        // (PDFastSim), so each photon is detected with probability QE; a second
++        // Poisson draw on the mean would give Var/mean = 1+QE instead of 1-QE.
++        int nphot = 0;
++        if (fBinomialQE) {
++          double const p = std::min(1., fQE * lateScale);
++          if (sdp.numPhotons > 0)
++            nphot = static_cast<int>(fRandBinomPhot.fire(sdp.numPhotons, p));
++        }
++        else
++          nphot = fRandPoissPhot.fire(fQE * (double)sdp.numPhotons * lateScale);
+ 
+         // For each true photon detected
+         for(int truePh=0; truePh<nphot; ++truePh) {
+@@ -326,7 +384,9 @@ namespace opdet {
+ 	    //Currently using all zeros as an indicator of Dark Noise for the trackID.
+       int PE = 1+CrossTalk();
+       for(int j = 0; j < PE; j++) {
+-        dr_plusnoise.AddPhoton(dr_plusnoise.OpDetNum(), 0, darkNoiseTime);
++        // darkNoiseTime is in us (fTimeBegin, fTimeEnd, tau); DivRec times are ns
++        dr_plusnoise.AddPhoton(dr_plusnoise.OpDetNum(), 0,
++                               fDarkNoiseTimeInNs ? darkNoiseTime*1000. : darkNoiseTime);
+       }
+ 
+       // Find next time to simulate a single PE pulse
+diff --git a/duneopdet/OpticalDetector/WaveformDigitizerSim.fcl b/duneopdet/OpticalDetector/WaveformDigitizerSim.fcl
+index 9bb42cd..6283437 100644
+--- a/duneopdet/OpticalDetector/WaveformDigitizerSim.fcl
++++ b/duneopdet/OpticalDetector/WaveformDigitizerSim.fcl
+@@ -15,6 +15,7 @@ standard_daphne:
+   BackTime:               0.386  
+ 
+   Padding:              100      # ticks
++  MergeOverlappingRanges: true   # keep the focus ranges disjoint; false = legacy (stores samples twice under pile-up)
+   ReadoutWindow:        320      # ticks
+   PreTrigger:            20      # ticks
+   Threshold:              1.5    # PE
+diff --git a/duneopdet/OpticalDetector/WaveformDigitizerSim_module.cc b/duneopdet/OpticalDetector/WaveformDigitizerSim_module.cc
+index a501702..0e3e8b3 100644
+--- a/duneopdet/OpticalDetector/WaveformDigitizerSim_module.cc
++++ b/duneopdet/OpticalDetector/WaveformDigitizerSim_module.cc
+@@ -47,6 +47,7 @@
+ #include "lardataobj/RawData/OpDetWaveform.h"
+ #include "larana/OpticalDetector/OpHitFinder/AlgoSiPM.h"
+ #include "duneopdet/OpticalDetector/AlgoSSPLeadingEdge.h"
++#include "duneopdet/OpticalDetector/FocusList.h"
+ #include "dunecore/DuneObj/OpDetDivRec.h"
+ #include "lardata/DetectorInfoServices/LArPropertiesService.h"
+ #include "larcore/Geometry/WireReadout.h"
+@@ -74,53 +75,6 @@ namespace opdet {
+ 
+   using std::vector;
+   using std::pair;
+-  typedef std::vector< std::pair< size_t, size_t > > Ranges_t;
+-
+-  class FocusList
+-  {
+-  public:
+-    FocusList(size_t nSamples, size_t padding)
+-      : fNSamples(nSamples), fPadding(padding) 
+-    {}
+-
+-    void AddRange(size_t from, size_t to)
+-    {
+-      from -= std::min(from, fPadding);
+-      to   =  std::min(to+fPadding, fNSamples-1);
+-
+-      for(size_t i = 0; i < ranges.size(); ++i){
+-        pair<size_t, size_t>& r = ranges[i];
+-        // Completely nested, discard
+-        if(from >= r.first && to <= r.second) return;
+-        // Extend end
+-        if(from >= r.first && from <= r.second){
+-          r.second = to;
+-          return;
+-        }
+-        // Extend front
+-        if(to >= r.first && to <= r.second){
+-          r.first = from;
+-          return;
+-        }
+-      }
+-      // Discontiguous, add
+-      ranges.emplace_back(from, to);
+-    }
+-
+-    void everything()
+-    {
+-      ranges.clear();
+-      ranges.emplace_back(0, fNSamples-1);
+-    }
+-
+-    
+-    Ranges_t ranges;
+-
+-  protected:
+-    size_t fNSamples;
+-    size_t fPadding;
+-  };
+-
+   class WaveformDigitizerSim : public art::EDProducer{
+ 
+   public:
+@@ -149,6 +103,10 @@ namespace opdet {
+       // Waveform output Settings
+       fhicl::Atom<size_t>            Padding             { Name("Padding"),
+                                                            Comment("Minimum ticks around pulses to simulate")};
++      fhicl::Atom<bool>              MergeOverlappingRanges { Name("MergeOverlappingRanges"),
++                                                           Comment("Keep the focus ranges disjoint. false reproduces the legacy behaviour, "
++                                                                   "which stores samples twice where pulses pile up. Default true."),
++                                                           true };
+       fhicl::Atom<size_t>            ReadoutWindow       { Name("ReadoutWindow"),
+                                                            Comment("Total size of the triggered readout window in ticks")};
+       fhicl::Atom<size_t>            PreTrigger          { Name("PreTrigger"),
+@@ -198,6 +156,7 @@ namespace opdet {
+ 
+     // Waveform output settings
+     size_t  fPadding;
++    bool    fMergeOverlappingRanges;
+     size_t  fReadoutWindow;
+     size_t  fPreTrigger;
+     double  fThresholdPE;
+@@ -306,6 +265,7 @@ namespace opdet {
+     , fBackTime{            config().BackTime() }
+ 
+     , fPadding{             config().Padding() }
++    , fMergeOverlappingRanges{ config().MergeOverlappingRanges() }
+     , fReadoutWindow{       config().ReadoutWindow() }
+     , fPreTrigger{          config().PreTrigger() }
+     , fThresholdPE{         config().Threshold() }
+@@ -487,7 +447,7 @@ namespace opdet {
+       // Create the vector (to address multiple readout channels per OpDet) of empty waveform vector and focus list
+       std::vector< std::vector< double > > pdWaveforms(nChannelsPerOpDet,
+                                                        std::vector< double >(nSamples, static_cast< double >(fPedestal)));
+-      std::vector<FocusList> fls(nChannelsPerOpDet, FocusList(nSamples, fPadding));
++      std::vector<FocusList> fls(nChannelsPerOpDet, FocusList(nSamples, fPadding, fMergeOverlappingRanges));
+ 
+       // Add a PE template to the waveform for each true photon
+       for (auto dr_p: vDivRecs) AddPEsToWaveform(dr_p, nChannelsPerOpDet, pdWaveforms, fls);
+@@ -607,7 +567,9 @@ namespace opdet {
+           if (!fire) {
+             // Start a new readout window 
+             fire   = true;
+-            wstart = tick-fPreTrigger;
++            // Clamp at the start of the waveform: tick-fPreTrigger would wrap
++            // around (size_t) for a trigger in the first fPreTrigger ticks
++            wstart = (tick >= fPreTrigger) ? tick-fPreTrigger : 0;
+             wend   = tick-fPreTrigger+fReadoutWindow;
+           }
+           else {
+diff --git a/duneopdet/OpticalDetector/FocusList.h b/duneopdet/OpticalDetector/FocusList.h
+new file mode 100644
+index 0000000..c6ed291
+--- /dev/null
++++ b/duneopdet/OpticalDetector/FocusList.h
+@@ -0,0 +1,116 @@
++//=========================================================
++// FocusList.h
++// The sample ranges ("focus ranges") of a simulated photon
++// detector waveform where a digitizer adds line noise and
++// evaluates its self-trigger: each photoelectron pulse plus
++// padding on both sides.
++//
++// The ranges are kept disjoint. Overlapping ranges make
++// every loop over them visit the same samples more than
++// once: WaveformDigitizerSim then stores those samples in
++// two readout windows (duplicate OpHits downstream) and adds
++// the line noise to them twice. With pile-up (radiological
++// backgrounds) the legacy AddRange left ranges overlapping
++// whenever a new range enclosed an existing one or an
++// extension reached a neighbouring range.
++//=========================================================
++
++#ifndef DUNEOPDET_OPTICALDETECTOR_FOCUSLIST_H
++#define DUNEOPDET_OPTICALDETECTOR_FOCUSLIST_H
++
++#include <algorithm>
++#include <cstddef>
++#include <utility>
++#include <vector>
++
++namespace opdet {
++
++  typedef std::vector< std::pair< size_t, size_t > > Ranges_t;
++
++  class FocusList
++  {
++  public:
++    // mergeOverlaps = false reproduces the legacy behaviour, which can leave
++    // overlapping ranges; kept only to reproduce existing samples.
++    FocusList(size_t nSamples, size_t padding, bool mergeOverlaps = true)
++      : fNSamples(nSamples), fPadding(padding), fMergeOverlaps(mergeOverlaps)
++    {}
++
++    // Add the range [from, to] (inclusive, in ticks), padded on both sides
++    // and clipped to the waveform.
++    void AddRange(size_t from, size_t to)
++    {
++      from -= std::min(from, fPadding);
++      to   =  std::min(to+fPadding, fNSamples-1);
++
++      if (!fMergeOverlaps) {
++        AddRangeLegacy(from, to);
++        return;
++      }
++
++      // Merge the new range with every range it overlaps. The union goes into
++      // the first overlapping range in list order (the one the legacy code
++      // extends) and the others are removed. The existing ranges are disjoint,
++      // so one pass finds all of them. When nothing is enclosed or bridged the
++      // result, including the order of the ranges, is the legacy one.
++      auto merged = ranges.end();
++      for (auto it = ranges.begin(); it != ranges.end(); ) {
++        if (from <= it->second && to >= it->first) {
++          from = std::min(from, it->first);
++          to   = std::max(to, it->second);
++          if (merged == ranges.end()) {
++            merged = it;
++            ++it;
++          }
++          else {
++            it = ranges.erase(it);
++          }
++        }
++        else {
++          ++it;
++        }
++      }
++
++      if (merged == ranges.end()) ranges.emplace_back(from, to);
++      else                        *merged = std::make_pair(from, to);
++    }
++
++    void everything()
++    {
++      ranges.clear();
++      ranges.emplace_back(0, fNSamples-1);
++    }
++
++    Ranges_t ranges;
++
++  protected:
++    size_t fNSamples;
++    size_t fPadding;
++    bool   fMergeOverlaps;
++
++  private:
++    void AddRangeLegacy(size_t from, size_t to)
++    {
++      for(size_t i = 0; i < ranges.size(); ++i){
++        std::pair<size_t, size_t>& r = ranges[i];
++        // Completely nested, discard
++        if(from >= r.first && to <= r.second) return;
++        // Extend end
++        if(from >= r.first && from <= r.second){
++          r.second = to;
++          return;
++        }
++        // Extend front
++        if(to >= r.first && to <= r.second){
++          r.first = from;
++          return;
++        }
++      }
++      // Discontiguous, add
++      ranges.emplace_back(from, to);
++    }
++  };
++
++}
++
++#endif
+diff --git a/duneopdet/OpticalDetector/test/CMakeLists.txt b/duneopdet/OpticalDetector/test/CMakeLists.txt
+new file mode 100644
+index 0000000..7279327
+--- /dev/null
++++ b/duneopdet/OpticalDetector/test/CMakeLists.txt
+@@ -0,0 +1 @@
++cet_test(FocusList_test USE_BOOST_UNIT)
+diff --git a/duneopdet/OpticalDetector/test/FocusList_test.cc b/duneopdet/OpticalDetector/test/FocusList_test.cc
+new file mode 100644
+index 0000000..d4a23ff
+--- /dev/null
++++ b/duneopdet/OpticalDetector/test/FocusList_test.cc
+@@ -0,0 +1,149 @@
++// Unit tests for duneopdet/OpticalDetector/FocusList.h: the focus ranges of
++// WaveformDigitizerSim must stay disjoint, and must be the legacy ones
++// whenever the legacy code kept them disjoint.
++
++#define BOOST_TEST_MODULE FocusList_test
++#include <boost/test/unit_test.hpp>
++
++#include "duneopdet/OpticalDetector/FocusList.h"
++
++#include <random>
++#include <vector>
++
++using opdet::FocusList;
++using opdet::Ranges_t;
++
++namespace {
++
++  // Samples covered by the ranges, counting a sample once per range covering it
++  std::vector<int> coverage(Ranges_t const& ranges, size_t nSamples)
++  {
++    std::vector<int> cov(nSamples, 0);
++    for (auto const& r : ranges)
++      for (size_t k = r.first; k <= r.second; ++k) ++cov[k];
++    return cov;
++  }
++
++  bool disjoint(Ranges_t const& ranges, size_t nSamples)
++  {
++    for (int c : coverage(ranges, nSamples))
++      if (c > 1) return false;
++    return true;
++  }
++
++}
++
++BOOST_AUTO_TEST_CASE(padding_and_clipping)
++{
++  FocusList fl(1000, 10);
++  fl.AddRange(5, 20);     // front clipped at 0
++  fl.AddRange(990, 995);  // back clipped at nSamples-1
++  fl.AddRange(500, 510);
++  Ranges_t const expected{{0, 30}, {980, 999}, {490, 520}};
++  BOOST_TEST(fl.ranges == expected);
++}
++
++BOOST_AUTO_TEST_CASE(nested_extend_and_disjoint_as_legacy)
++{
++  // No range encloses or bridges another: the legacy result, order included
++  FocusList fixed(1000, 0), legacy(1000, 0, false);
++  for (auto* fl : {&fixed, &legacy}) {
++    fl->AddRange(100, 200);
++    fl->AddRange(500, 600);
++    fl->AddRange(150, 180);  // nested
++    fl->AddRange(190, 250);  // extends the end of the first
++    fl->AddRange(450, 520);  // extends the front of the second
++    fl->AddRange(300, 310);  // disjoint
++  }
++  Ranges_t const expected{{100, 250}, {450, 600}, {300, 310}};
++  BOOST_TEST(fixed.ranges == expected);
++  BOOST_TEST(legacy.ranges == expected);
++}
++
++BOOST_AUTO_TEST_CASE(enclosing_range_is_merged)
++{
++  FocusList fixed(1000, 0), legacy(1000, 0, false);
++  for (auto* fl : {&fixed, &legacy}) {
++    fl->AddRange(100, 200);
++    fl->AddRange(50, 300);   // encloses [100, 200]
++  }
++  BOOST_TEST(fixed.ranges == (Ranges_t{{50, 300}}));
++  // The legacy bug: appended as a second, overlapping range
++  BOOST_TEST(legacy.ranges == (Ranges_t{{100, 200}, {50, 300}}));
++}
++
++BOOST_AUTO_TEST_CASE(bridging_range_is_merged)
++{
++  FocusList fixed(1000, 0), legacy(1000, 0, false);
++  for (auto* fl : {&fixed, &legacy}) {
++    fl->AddRange(100, 200);
++    fl->AddRange(300, 400);
++    fl->AddRange(500, 600);
++    fl->AddRange(150, 550);  // reaches the second and third ranges
++  }
++  // Merged into the first overlapping range, the others removed
++  BOOST_TEST(fixed.ranges == (Ranges_t{{100, 600}}));
++  // The legacy bug: the first range is extended over the other two
++  BOOST_TEST(legacy.ranges == (Ranges_t{{100, 550}, {300, 400}, {500, 600}}));
++}
++
++BOOST_AUTO_TEST_CASE(touching_ranges_stay_separate)
++{
++  // Ranges sharing no sample are not merged, as in the legacy code
++  FocusList fixed(1000, 0);
++  fixed.AddRange(100, 200);
++  fixed.AddRange(201, 300);
++  BOOST_TEST(fixed.ranges == (Ranges_t{{100, 200}, {201, 300}}));
++  fixed.AddRange(200, 201);
++  BOOST_TEST(fixed.ranges == (Ranges_t{{100, 300}}));
++}
++
++BOOST_AUTO_TEST_CASE(everything_covers_the_waveform)
++{
++  FocusList fl(1000, 10);
++  fl.AddRange(100, 200);
++  fl.everything();
++  BOOST_TEST(fl.ranges == (Ranges_t{{0, 999}}));
++}
++
++BOOST_AUTO_TEST_CASE(random_pileup)
++{
++  // Pulses at random times, as in WaveformDigitizerSim: 325-tick pulses plus
++  // 100 ticks of padding. The fixed ranges must be disjoint and cover exactly
++  // the padded pulses; whenever the legacy ranges came out disjoint they must
++  // be identical to the fixed ones.
++  size_t const nSamples = 20000, padding = 100, pulse = 325;
++  std::mt19937 gen(12345);
++  int nLegacyDisjoint = 0, nLegacyOverlap = 0;
++  for (int trial = 0; trial < 2000; ++trial) {
++    size_t const nPulses = 1 + trial % 60;
++    std::uniform_int_distribution<size_t> start(0, nSamples - 1);
++    FocusList fixed(nSamples, padding), legacy(nSamples, padding, false);
++    std::vector<bool> truth(nSamples, false);
++    for (size_t p = 0; p < nPulses; ++p) {
++      size_t const from = start(gen);
++      size_t const to = std::min(from + pulse - 1, nSamples - 1);
++      fixed.AddRange(from, to);
++      legacy.AddRange(from, to);
++      for (size_t k = (from > padding ? from - padding : 0); k <= std::min(to + padding, nSamples - 1); ++k)
++        truth[k] = true;
++    }
++    auto const cov = coverage(fixed.ranges, nSamples);
++    bool sameCover = true, isDisjoint = true;
++    for (size_t k = 0; k < nSamples; ++k) {
++      if ((cov[k] > 0) != truth[k]) sameCover = false;
++      if (cov[k] > 1) isDisjoint = false;
++    }
++    BOOST_TEST(isDisjoint);
++    BOOST_TEST(sameCover);
++    if (disjoint(legacy.ranges, nSamples)) {
++      ++nLegacyDisjoint;
++      BOOST_TEST(fixed.ranges == legacy.ranges);
++    }
++    else
++      ++nLegacyOverlap;
++  }
++  // Both regimes must have been exercised
++  BOOST_TEST(nLegacyDisjoint > 100);
++  BOOST_TEST(nLegacyOverlap > 100);
++}

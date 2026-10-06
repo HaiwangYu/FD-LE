@@ -1,0 +1,17 @@
+# Re-run the light-only detector simulation on an event that already went through the full chain.
+#
+# The photon-detector simulation starts from the OpDetBacktrackerRecords that Geant4 (PDFastSim) wrote, which are kept
+# in reco.root, so different duneopdet builds or settings can be compared on exactly the same photons without
+# re-running Geant4.  The original detsim/reco products are dropped on input, so this job's products are the only ones.
+# run_rerun.sh appends the event's own detsim seed (masterSeed) and the knob settings of the chosen configuration.
+#include "detsim_light_only.fcl"
+
+process_name: DetsimRerun
+source: {
+  module_type: RootInput
+  maxEvents: -1
+  inputCommands: [ "keep *", "drop *_*_*_detsim", "drop *_*_*_Reco" ]
+}
+outputs.out1.fileName: "detsim_rerun.root"
+outputs.out1.compressionLevel: 1
+services.NuRandomService.policy: "random"

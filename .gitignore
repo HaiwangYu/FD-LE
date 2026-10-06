@@ -1,0 +1,9 @@
+# data, builds and LaTeX by-products are never committed
+00-op-sim-debug/work/data/
+*.root
+*.npz
+00-op-sim-debug/tech-note/tex/*.aux
+00-op-sim-debug/tech-note/tex/*.log
+00-op-sim-debug/tech-note/tex/*.out
+00-op-sim-debug/tech-note/tex/*.toc
+00-op-sim-debug/tech-note/tex/*.pdf

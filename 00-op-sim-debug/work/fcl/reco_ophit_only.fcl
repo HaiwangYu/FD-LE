@@ -1,0 +1,8 @@
+# Light-only reconstruction for the FD-VD 1x8x14 workspace: the official OpHit finder ophit10ppm only.
+#
+# ophit10ppm (dunefdvd_ophit, larana AlgoSiPM) turns the raw::OpDetWaveform snippets into recob::OpHits.
+# The official flash finder opflash10ppm is not run: it has its own indexing bug (Xin Qian, fdvd_sim doc 03),
+# outside the scope of this note.
+#include "standard_reco_dunevd10kt_1x8x14_3view_30deg.fcl"
+
+physics.reco: [ rns, ophit10ppm ]

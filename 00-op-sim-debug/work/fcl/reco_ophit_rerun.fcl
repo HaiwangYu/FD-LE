@@ -1,0 +1,6 @@
+# OpHit finder on the output of detsim_light_rerun.fcl; writes only the new recob::OpHits.
+#include "reco_ophit_only.fcl"
+
+process_name: OpHitRerun
+outputs.out1.fileName: "ophit_rerun.root"
+outputs.out1.outputCommands: [ "drop *", "keep recob::OpHits_ophit10ppm__OpHitRerun" ]

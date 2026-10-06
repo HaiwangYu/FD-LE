@@ -1,0 +1,43 @@
+# reproducibility gates
+sol   0  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol   1  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol   2  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol   3  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol   4  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol   5  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol   6  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol   7  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol   8  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol   9  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol  10  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol  11  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol  12  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol  13  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol  14  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol  15  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol  16  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol  17  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol  18  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol  19  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (0 wrapped -> 0 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix   0  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (13 wrapped -> 13 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix   1  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (12 wrapped -> 12 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix   2  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (5 wrapped -> 5 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix   3  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (13 wrapped -> 13 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix   4  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (9 wrapped -> 9 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix   5  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (6 wrapped -> 6 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix   6  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (11 wrapped -> 11 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix   7  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (8 wrapped -> 8 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix   8  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (7 wrapped -> 7 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix   9  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (14 wrapped -> 14 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix  10  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (7 wrapped -> 7 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix  11  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (7 wrapped -> 7 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix  12  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (1 wrapped -> 1 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix  13  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (8 wrapped -> 8 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix  14  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (3 wrapped -> 3 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix  15  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (10 wrapped -> 10 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix  16  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (14 wrapped -> 14 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix  17  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (14 wrapped -> 14 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix  18  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (12 wrapped -> 12 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+mix  19  stock==stored True  legacy DivRec==stock True  legacy-vs-stock snippets differ only by E True (12 wrapped -> 12 clamped)  fixB DivRec unchanged True  fixC Xe DivRec unchanged True
+sol: fixB waveforms identical to legacy in 17 events [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 15, 16, 17, 18, 19]; legacy has no sample stored twice in 13 events [0, 1, 2, 3, 6, 7, 8, 12, 13, 16, 17, 18, 19]
+mix: fixB waveforms identical to legacy in 0 events []; legacy has no sample stored twice in 0 events []
